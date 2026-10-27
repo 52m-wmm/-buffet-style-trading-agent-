@@ -13,6 +13,8 @@ function ScreenResultView({ out }: { out: any }) {
   const results: Record<string, any> = out.results ?? {};
   const controls: string[] = out.controls ?? [];
   return (
+    <>
+    <h3>每家公司的结果</h3>
     <table className="grid">
       <thead>
         <tr>
@@ -38,6 +40,7 @@ function ScreenResultView({ out }: { out: any }) {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
