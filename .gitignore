@@ -1,0 +1,10 @@
+__pycache__/
+*.db
+.cache/
+config.yaml
+prices/
+node_modules/
+dist/
+.venv/
+.DS_Store
+*.tsbuildinfo

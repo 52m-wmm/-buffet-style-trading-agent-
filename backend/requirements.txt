@@ -1,0 +1,11 @@
+fastapi>=0.110
+uvicorn>=0.29
+pandas>=2.0
+numpy>=1.26
+requests>=2.31
+pydantic>=2.6
+pyyaml>=6.0
+# optional
+# yfinance      # PriceStore.from_yfinance
+# pytest        # tests also run with python -m unittest
+eval_type_backport; python_version < "3.10"   # lets pydantic read `X | None` on Python 3.9

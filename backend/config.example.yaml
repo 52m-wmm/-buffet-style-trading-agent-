@@ -1,0 +1,31 @@
+# Copy to config.yaml. Freeze these BEFORE running; every run stores the config it used.
+screen:
+  roe_min: 0.15
+  roe_years_required: 8
+  debt_to_income_max: 4.0
+  profitable_years_required: 9
+  fcf_years: 5
+  gross_margin_std_max: 0.05
+decision:
+  buy_total_min: 4.0
+  buy_dimension_floor: 2
+  sell_total_below: 3.5
+  sell_dimension_at: 1
+  safety_margin: 0.02
+  stop_loss: 0.20            # set to null to disable
+  reentry_cooldown_days: 90
+risk:
+  max_position_weight: 0.10
+  max_sector_weight: 0.30
+  max_new_positions_per_step: 3
+  trading_enabled: true
+cost:
+  commission_bps: 1.0
+  spread_bps: 5.0
+llm:
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-flash
+  temperature: 0.0
+  max_retries: 2
+initial_cash: 100000
+benchmark: SPY
