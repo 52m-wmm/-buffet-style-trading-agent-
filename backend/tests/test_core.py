@@ -89,6 +89,18 @@ class Metrics(unittest.TestCase):
                          "LongTermDebtNoncurrent + LongTermDebtAndCapitalLeaseObligations")
 
 
+    def test_gross_profit_is_derived_for_years_it_was_not_tagged(self):
+        def flow(y, v):
+            return {"form": "10-K", "start": f"{y}-01-01", "end": f"{y}-12-31", "filed": f"{y + 1}-02-20", "val": v}
+        facts = {"facts": {"us-gaap": {
+            "Revenues": {"units": {"USD": [flow(2018, 100), flow(2019, 110), flow(2020, 120)]}},
+            "GrossProfit": {"units": {"USD": [flow(2018, 13)]}},        # stopped tagging after 2018
+            "CostOfGoodsAndServicesSold": {"units": {"USD": [flow(2019, 96), flow(2020, 105)]}},
+        }}}
+        gp = fundamentals_as_of(facts, date(2026, 1, 1)).annual["gross_profit"]
+        self.assertEqual(list(gp), [13, 14, 15])
+
+
 class Sections(unittest.TestCase):
     def test_skips_table_of_contents(self):
         out = split_10k(demo.filing_text("NFBR"))

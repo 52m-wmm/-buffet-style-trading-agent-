@@ -19,14 +19,22 @@ import pandas as pd
 TAGS: dict[str, list[str]] = {
     "revenue": ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
                 "SalesRevenueNet"],
-    "net_income": ["NetIncomeLoss"],
+    # Fallbacks after the first entry were chosen from what the S&P 500 actually files
+    # (2026-10-27 screen); each one means the same thing as the tag before it.
+    "net_income": ["NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic",
+                   "ProfitLoss"],   # ProfitLoss includes minority interests
     "equity": ["StockholdersEquity",
                "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
-    "lt_debt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
+    "lt_debt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations",
+                "LongTermNotesPayable", "OtherLongTermDebtNoncurrent"],
     "gross_profit": ["GrossProfit"],
-    "cost_of_revenue": ["CostOfRevenue", "CostOfGoodsAndServicesSold"],
-    "ocf": ["NetCashProvidedByUsedInOperatingActivities"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    "cost_of_revenue": ["CostOfRevenue", "CostOfGoodsAndServicesSold",
+                        "CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization"],
+    # Not CostsAndExpenses: that is total cost, which would give operating margin.
+    "ocf": ["NetCashProvidedByUsedInOperatingActivities",
+            "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"],
+    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
+              "PaymentsToAcquireOtherPropertyPlantAndEquipment", "PaymentsForCapitalImprovements"],
 }
 FLOW = {"revenue", "net_income", "gross_profit", "cost_of_revenue", "ocf", "capex"}
 
@@ -84,9 +92,15 @@ def fundamentals_as_of(facts: dict, as_of: date) -> Fundamentals:
             cols[metric] = merged
             used[metric] = " + ".join(tags)
     annual = pd.DataFrame(cols).sort_index()
-    if "gross_profit" not in annual and {"revenue", "cost_of_revenue"} <= set(annual):
-        annual["gross_profit"] = annual["revenue"] - annual["cost_of_revenue"]
-        used["gross_profit"] = "derived: revenue - cost_of_revenue"
+    if {"revenue", "cost_of_revenue"} <= set(annual):
+        # Per year, not only when GrossProfit is absent: COST stopped tagging it in 2019.
+        derived = annual["revenue"] - annual["cost_of_revenue"]
+        if "gross_profit" not in annual:
+            annual["gross_profit"] = derived
+            used["gross_profit"] = "derived: revenue - cost_of_revenue"
+        elif annual["gross_profit"].isna().any() and derived[annual["gross_profit"].isna()].notna().any():
+            annual["gross_profit"] = annual["gross_profit"].fillna(derived)
+            used["gross_profit"] += " + derived: revenue - cost_of_revenue"
         if "gross_profit" in missing:
             missing.remove("gross_profit")
     return Fundamentals(annual=annual, tags_used=used, missing=missing)
