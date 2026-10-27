@@ -12,7 +12,7 @@
 ```bash
 cd backend
 pip install -r requirements.txt
-python -m unittest -v          # 23个离线测试
+python -m unittest -v          # 30个离线测试
 python -m buffett_agent demo   # 用6家虚构公司跑完整流程
 ```
 
