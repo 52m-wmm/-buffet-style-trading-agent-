@@ -19,6 +19,7 @@ from buffett_agent.pipeline import run_demo
 from buffett_agent.research.anonymize import anonymize
 from buffett_agent.research.citations import verify_quote, verify_scorecard
 from buffett_agent.research.scoring import score_company
+from buffett_agent.screening import screen_pool
 from buffett_agent.sources import EdgarSource
 from buffett_agent.store import Store
 from buffett_agent.trading.backtest import (LookAheadError, ScoreSnapshot, latest_snapshot,
@@ -73,6 +74,19 @@ class Metrics(unittest.TestCase):
     def test_tags_used_are_reported(self):
         f = fundamentals_as_of(demo._facts("NFBR"), date(2026, 7, 1))
         self.assertEqual(f.tags_used["net_income"], "NetIncomeLoss")
+
+
+    def test_tag_switch_fills_later_years_from_next_candidate(self):
+        def row(y, v):
+            return {"form": "10-K", "fp": "FY", "end": f"{y}-12-31", "filed": f"{y + 1}-02-20", "val": v}
+        facts = {"facts": {"us-gaap": {
+            "LongTermDebtNoncurrent": {"units": {"USD": [row(2022, 30), row(2023, 31)]}},
+            "LongTermDebtAndCapitalLeaseObligations": {"units": {"USD": [row(2023, 99), row(2024, 32)]}},
+        }}}
+        f = fundamentals_as_of(facts, date(2026, 1, 1))
+        self.assertEqual(list(f.annual["lt_debt"]), [30, 31, 32])   # 2023 keeps the preferred tag
+        self.assertEqual(f.tags_used["lt_debt"],
+                         "LongTermDebtNoncurrent + LongTermDebtAndCapitalLeaseObligations")
 
 
 class Sections(unittest.TestCase):
@@ -200,6 +214,22 @@ class Universe(unittest.TestCase):
             self.assertEqual(src.sectors["KO"], "Consumer Staples")
             self.assertEqual(src.companies(date(2026, 7, 1)), [])     # run continues
             self.assertIn("SEC refused", src.skipped["KO"])
+
+
+class ScreenOnly(unittest.TestCase):
+    def test_screen_pool_matches_pipeline_and_skips_failures(self):
+        def load(t):
+            if t == "BAD":
+                raise RuntimeError("SEC refused")
+            return demo._facts(t)
+
+        tickers = list(demo.PROFILES) + ["BAD"]
+        rep = screen_pool(load, tickers, demo.AS_OF, Config().screen)
+        self.assertEqual(rep["passed"], ["CPLF", "HLNF", "NFBR", "RRSV"])   # same as demo step 1
+        self.assertEqual(rep["screened"], 6)
+        self.assertIn("SEC refused", rep["skipped"]["BAD"])
+        self.assertEqual(rep["thresholds"]["roe_min"], 0.15)               # recorded
+        json.dumps(rep)
 
 
 class EndToEnd(unittest.TestCase):

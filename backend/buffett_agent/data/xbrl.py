@@ -22,7 +22,7 @@ TAGS: dict[str, list[str]] = {
     "net_income": ["NetIncomeLoss"],
     "equity": ["StockholdersEquity",
                "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
-    "lt_debt": ["LongTermDebtNoncurrent", "LongTermDebt"],
+    "lt_debt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
     "gross_profit": ["GrossProfit"],
     "cost_of_revenue": ["CostOfRevenue", "CostOfGoodsAndServicesSold"],
     "ocf": ["NetCashProvidedByUsedInOperatingActivities"],
@@ -67,14 +67,22 @@ def fundamentals_as_of(facts: dict, as_of: date) -> Fundamentals:
     used: dict[str, str] = {}
     missing: list[str] = []
     for metric, candidates in TAGS.items():
+        # Companies switch tags over time (KO moved off LongTermDebtNoncurrent in 2024),
+        # so fill each year from the first candidate that has it, not the first tag only.
+        merged, tags = None, []
         for tag in candidates:
             s = _annual_series(facts, tag, as_of, metric in FLOW)
-            if not s.empty:
-                cols[metric] = s
-                used[metric] = tag
-                break
-        else:
+            if s.empty:
+                continue
+            if merged is None:
+                merged, tags = s, [tag]
+            elif len(s.index.difference(merged.index)):
+                merged, tags = merged.combine_first(s), tags + [tag]
+        if merged is None:
             missing.append(metric)
+        else:
+            cols[metric] = merged
+            used[metric] = " + ".join(tags)
     annual = pd.DataFrame(cols).sort_index()
     if "gross_profit" not in annual and {"revenue", "cost_of_revenue"} <= set(annual):
         annual["gross_profit"] = annual["revenue"] - annual["cost_of_revenue"]
