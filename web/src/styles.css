@@ -143,3 +143,36 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .kv td.changed { color: var(--model); font-weight: 600; }
 .kv td small { font-weight: 400; color: var(--muted); margin-left: 4px; }
 .grid td.verdict--pass, .grid td.verdict--fail { text-align: center; }
+
+/* step 1: rule groups and results */
+.body--wide { grid-template-columns: minmax(0, 1fr) 680px; }
+@media (max-width: 1200px) { .body--wide { grid-template-columns: minmax(0, 1fr) 560px; } }
+.form__group { border: 0; margin: 10px 0 0; padding: 0; min-width: 0; }
+.form__group legend { font-size: 13px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 2px; }
+.kv__group th small { display: block; font-size: 12px; font-weight: 600; margin: 8px 0 2px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.seg button {
+  font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+}
+.seg button.seg--on { border-color: var(--model); background: var(--model-tint); color: var(--model); font-weight: 600; }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.group {
+  font: inherit; text-align: left; cursor: pointer; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--bg); color: var(--ink); display: flex; flex-direction: column; gap: 2px;
+}
+.group--on { border: 2px solid var(--model); padding: 9px 11px; background: var(--surface); }
+.group__label { font-size: 13px; color: var(--muted); }
+.group__count { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.group__count small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.group__desc { font-size: 12px; color: var(--muted); }
+.group__desc--warn { color: #9a5b00; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0 8px; cursor: pointer; }
+.grid-wrap { overflow-x: auto; }
+.grid--screen { font-size: 13px; }
+.grid--screen td.num, .grid--screen th.num { text-align: right; white-space: nowrap; }
+.grid--screen td.verdict--pass, .grid--screen td.verdict--fail { font-weight: 500; }
+.muted { color: var(--muted); }
+.badge { font-size: 11px; font-weight: 500; padding: 0 5px; margin-left: 4px; border-radius: 4px; background: var(--warn-bg); color: #9a5b00; }
+.review { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--warn-bg); color: #7a4700; }
+code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 4px; }

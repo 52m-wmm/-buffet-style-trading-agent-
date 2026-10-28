@@ -5,10 +5,13 @@ Run:  uvicorn buffett_agent.api:app --reload --port 8000
 """
 from __future__ import annotations
 
+import json
 import math
 import os
+import re
 from dataclasses import asdict
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -24,6 +27,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"],
                    allow_methods=["*"], allow_headers=["*"])
 store = Store(os.environ.get("BUFFETT_DB", "buffett_agent.db"))
 cfg = load_config(os.environ.get("BUFFETT_CONFIG", "config.yaml"))
+# Where `python -m buffett_agent screen` writes its reports (screen_<as-of>.json).
+screens_dir = Path(os.environ.get("BUFFETT_SCREENS", "."))
+_SCREEN_NAME = re.compile(r"screen_[\w-]+\.json")
 
 
 class ScreenOverrides(BaseModel):
@@ -62,6 +68,30 @@ def pipeline_graph():
 @app.get("/api/config/screen")
 def screen_defaults():
     return asdict(cfg.screen)
+
+
+@app.get("/api/screens")
+def screen_reports():
+    """Pool screens made from the command line, newest first. The results are left out."""
+    out = []
+    for p in sorted(screens_dir.glob("screen_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            rep = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        out.append({"name": p.name, "as_of": rep.get("as_of"), "pool": rep.get("pool"),
+                    "screened": rep.get("screened"), "passed": len(rep.get("passed", []))})
+    return out
+
+
+@app.get("/api/screens/{name}")
+def screen_report(name: str):
+    if not _SCREEN_NAME.fullmatch(name):   # no paths, only report files
+        raise HTTPException(404, "report not found")
+    p = screens_dir / name
+    if not p.is_file():
+        raise HTTPException(404, "report not found")
+    return _finite(json.loads(p.read_text(encoding="utf-8")))
 
 
 @app.get("/api/runs")

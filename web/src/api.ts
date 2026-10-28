@@ -20,6 +20,17 @@ export type Run = {
   status: string;
   screen: ScreenParams | null; // thresholds this run actually used
 };
+export type ScreenReportInfo = { name: string; as_of: string; pool: number; screened: number; passed: number };
+// Written by `python -m buffett_agent screen`; see screening.screen_pool.
+export type ScreenReport = {
+  as_of: string;
+  thresholds: ScreenParams;
+  pool: number;
+  screened: number;
+  passed: string[];
+  skipped: Record<string, string>;
+  results: Record<string, any>;
+};
 export type StepRun = {
   step: string;
   status: "ok" | "failed" | "skipped";
@@ -45,6 +56,9 @@ export const api = {
   graph: () => fetch("/api/pipeline").then((r) => json<Graph>(r)),
   screenDefaults: () => fetch("/api/config/screen").then((r) => json<ScreenParams>(r)),
   runs: () => fetch("/api/runs").then((r) => json<Run[]>(r)),
+  screenReports: () => fetch("/api/screens").then((r) => json<ScreenReportInfo[]>(r)),
+  screenReport: (name: string) =>
+    fetch(`/api/screens/${encodeURIComponent(name)}`).then((r) => json<ScreenReport>(r)),
   steps: (id: string) => fetch(`/api/runs/${id}/steps`).then((r) => json<StepRun[]>(r)),
   startDemo: (screen?: Partial<ScreenParams>) =>
     fetch("/api/runs", {

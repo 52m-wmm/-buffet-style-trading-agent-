@@ -1,20 +1,29 @@
 import type { ScreenParams } from "../api";
 
 type Key = keyof ScreenParams;
-type FieldDef = { key: Key; label: string; unit: string; pct?: boolean; int?: boolean; hint: string };
+type Group = "all" | "general" | "financials";
+type FieldDef = { key: Key; label: string; unit: string; pct?: boolean; int?: boolean; hint: string; group: Group };
+
+// Which companies each threshold applies to (rule groups in screening.py).
+const GROUP_TITLE: Record<Group, string> = {
+  all: "所有公司",
+  general: "通用规则（非金融，含地产和公用事业）",
+  financials: "金融规则（银行、保险、券商等）",
+};
 
 export const SCREEN_FIELDS: FieldDef[] = [
-  { key: "lookback_years", label: "回看年数", unit: "年", int: true, hint: "以下“几年”都在这个窗口里数" },
-  { key: "roe_min", label: "ROE 门槛", unit: "%", pct: true, hint: "每年 ROE 要高于它才算达标" },
-  { key: "roe_years_required", label: "ROE 达标年数", unit: "年", int: true, hint: "窗口内至少这么多年达标" },
-  { key: "debt_to_income_max", label: "长期负债 / 净利润", unit: "倍", hint: "用最近一年，不超过这个倍数" },
-  { key: "profitable_years_required", label: "盈利年数", unit: "年", int: true, hint: "净利润 > 0 的年数至少这么多" },
-  { key: "fcf_years", label: "自由现金流统计年数", unit: "年", int: true, hint: "最近这么多年累计自由现金流要 > 0" },
-  { key: "gross_margin_std_max", label: "毛利率标准差上限", unit: "%", pct: true, hint: "窗口内毛利率波动要小于它" },
-  { key: "roa_min", label: "金融业：ROA 门槛", unit: "%", pct: true, hint: "只用于金融公司，代替负债、现金流、毛利率三条" },
-  { key: "roa_years_required", label: "金融业：ROA 达标年数", unit: "年", int: true, hint: "窗口内至少这么多年 ROA 高于门槛" },
-  { key: "equity_to_assets_min", label: "金融业：股东权益 / 总资产", unit: "%", pct: true, hint: "最近一年，资本垫子至少这么厚" },
+  { key: "lookback_years", label: "回看年数", unit: "年", int: true, hint: "以下“几年”都在这个窗口里数", group: "all" },
+  { key: "roe_min", label: "ROE 门槛", unit: "%", pct: true, hint: "每年 ROE 要高于它才算达标", group: "all" },
+  { key: "roe_years_required", label: "ROE 达标年数", unit: "年", int: true, hint: "窗口内至少这么多年达标", group: "all" },
+  { key: "profitable_years_required", label: "盈利年数", unit: "年", int: true, hint: "净利润 > 0 的年数至少这么多", group: "all" },
+  { key: "debt_to_income_max", label: "长期负债 / 净利润", unit: "倍", hint: "用最近一年，不超过这个倍数", group: "general" },
+  { key: "fcf_years", label: "自由现金流统计年数", unit: "年", int: true, hint: "最近这么多年累计自由现金流要 > 0", group: "general" },
+  { key: "gross_margin_std_max", label: "毛利率标准差上限", unit: "%", pct: true, hint: "窗口内毛利率波动要小于它", group: "general" },
+  { key: "roa_min", label: "ROA 门槛", unit: "%", pct: true, hint: "净利润 / 总资产，每年要高于它", group: "financials" },
+  { key: "roa_years_required", label: "ROA 达标年数", unit: "年", int: true, hint: "窗口内至少这么多年达标", group: "financials" },
+  { key: "equity_to_assets_min", label: "股东权益 / 总资产", unit: "%", pct: true, hint: "最近一年，资本垫子至少这么厚", group: "financials" },
 ];
+const GROUPS = Object.keys(GROUP_TITLE) as Group[];
 
 /** What the user is typing, in display units (percent fields shown as 15, not 0.15). */
 export type ScreenDraft = Record<Key, string>;
@@ -68,7 +77,10 @@ export function ScreenForm({
           恢复默认
         </button>
       </div>
-      {SCREEN_FIELDS.map((f) => {
+      {GROUPS.map((g) => (
+        <fieldset key={g} className="form__group">
+          <legend>{GROUP_TITLE[g]}</legend>
+      {SCREEN_FIELDS.filter((f) => f.group === g).map((f) => {
         const isChanged = Number(draft[f.key]) !== Number(base[f.key]);
         return (
           <label key={f.key} className={`form__row${isChanged ? " form__row--changed" : ""}`}>
@@ -90,22 +102,27 @@ export function ScreenForm({
           </label>
         );
       })}
+        </fieldset>
+      ))}
       <p className="note">看到结果后再回头改阈值，最容易过拟合。每次运行都会记下当时用的阈值，方便事后对比。</p>
     </section>
   );
 }
 
-export function ScreenUsed({ used, defaults }: { used: ScreenParams; defaults: ScreenParams | null }) {
+export function ScreenUsed({
+  used, defaults, title = "这次运行用的阈值",
+}: { used: ScreenParams; defaults: ScreenParams | null; title?: string }) {
   return (
     <>
-      <h3>这次运行用的阈值</h3>
+      {title && <h3>{title}</h3>}
       <table className="kv">
         <tbody>
-          {SCREEN_FIELDS.filter((f) => used[f.key] != null).map((f) => {
+          {SCREEN_FIELDS.filter((f) => used[f.key] != null).map((f, i, shown) => {
+            const head = i === 0 || shown[i - 1].group !== f.group;
             const differs = defaults != null && used[f.key] !== defaults[f.key];
             return (
-              <tr key={f.key}>
-                <th>{f.label}</th>
+              <tr key={f.key} className={head ? "kv__group" : undefined}>
+                <th>{head && <small>{GROUP_TITLE[f.group]}</small>}{f.label}</th>
                 <td className={differs ? "changed" : undefined}>
                   {show(f, used[f.key])}
                   {differs && <small>（默认 {show(f, defaults![f.key])}）</small>}

@@ -11,6 +11,15 @@ from .config import ScreenConfig
 
 RULES = ("roe", "debt", "profitability", "fcf", "gross_margin", "roa", "capital")
 FINANCIALS = "Financials"   # GICS sector name in data/sp500.csv
+# Real estate and utilities still use the general rules; they are their own group so the
+# report shows that those rules are a poor fit there rather than hiding it in the total.
+PROVISIONAL = ("Real Estate", "Utilities")
+
+
+def rule_group(sector: str | None) -> str:
+    if sector == FINANCIALS:
+        return "financials"
+    return "provisional" if sector in PROVISIONAL else "general"
 
 
 def _years_above(series, floor: float, need: int, label: str) -> dict:
@@ -20,7 +29,8 @@ def _years_above(series, floor: float, need: int, label: str) -> dict:
 
 def screen_company(metrics: dict, cfg: ScreenConfig, sector: str | None = None) -> dict:
     checks: dict[str, dict] = {}
-    financial = sector == FINANCIALS
+    group = rule_group(sector)
+    financial = group == "financials"
 
     roe = metrics.get("_roe")
     if roe is None:
@@ -43,19 +53,25 @@ def screen_company(metrics: dict, cfg: ScreenConfig, sector: str | None = None) 
                              "rule": f"equity / total assets >= {cfg.equity_to_assets_min:.0%}"}
         for rule in ("debt", "fcf", "gross_margin"):
             checks[rule] = {"pass": True, "na": True, "value": None, "why": "not applied to financials"}
-        return {"passed": all(c["pass"] for c in checks.values()), "checks": checks, "rules": "financials"}
+        return {"passed": all(c["pass"] for c in checks.values()), "checks": checks,
+                "group": group, "sector": sector}
 
     d2i = metrics.get("debt_to_income")
     checks["debt"] = {"pass": d2i is not None and d2i <= cfg.debt_to_income_max,
                       "value": None if d2i is None or math.isinf(d2i) else round(d2i, 2),
                       "rule": f"long-term debt <= {cfg.debt_to_income_max}x net income"}
+    # `data` says how the number was obtained, so the UI can mark anything not read directly.
     if metrics.get("debt_assumed_zero"):
-        checks["debt"]["why"] = ("no debt on the latest balance sheet and interest under "
-                                 "2% of net income; counted as 0")
+        checks["debt"].update(data="zero", why="no debt on the latest balance sheet and interest "
+                                               "under 2% of net income; counted as 0")
     elif metrics.get("debt_source"):
-        checks["debt"]["why"] = f"latest long-term debt not tagged; used {metrics['debt_source']}"
+        checks["debt"].update(data="estimated",
+                              why=f"latest long-term debt not tagged; used {metrics['debt_source']}")
+    elif d2i is not None and math.isinf(d2i):
+        checks["debt"].update(data="loss", why="latest net income <= 0, so the ratio is undefined")
     elif metrics.get("debt_unknown"):
-        checks["debt"]["why"] = "pays interest but no debt balance in the XBRL data; check the 10-K"
+        checks["debt"].update(data="unknown",
+                              why="pays interest but no debt balance in the XBRL data; check the 10-K")
 
     fcf = metrics.get("fcf_cumulative")
     checks["fcf"] = {"pass": fcf is not None and fcf > 0, "value": fcf,
@@ -66,7 +82,8 @@ def screen_company(metrics: dict, cfg: ScreenConfig, sector: str | None = None) 
                               "value": None if gms is None else round(gms, 4),
                               "rule": f"gross margin std < {cfg.gross_margin_std_max:.0%}"}
 
-    return {"passed": all(c["pass"] for c in checks.values()), "checks": checks}
+    return {"passed": all(c["pass"] for c in checks.values()), "checks": checks,
+            "group": group, "sector": sector}
 
 
 def screen_pool(load_facts, tickers: list[str], as_of, cfg: ScreenConfig, progress=None,

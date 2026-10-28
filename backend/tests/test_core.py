@@ -325,5 +325,42 @@ class EndToEnd(unittest.TestCase):
             with_screen(Config(), {"no_such_rule": 1})
 
 
+class ScreenReports(unittest.TestCase):
+    """The UI reads pool screens written by `python -m buffett_agent screen`."""
+
+    def setUp(self):
+        import os, tempfile
+        from pathlib import Path
+        self.tmp = Path(tempfile.mkdtemp())
+        os.environ["BUFFETT_DB"] = str(self.tmp / "t.db")   # importing api opens a store
+        from buffett_agent import api
+        self.api = api
+        self._dir, api.screens_dir = api.screens_dir, self.tmp
+
+    def tearDown(self):
+        self.api.screens_dir = self._dir
+
+    def test_lists_and_reads_reports_but_no_other_files(self):
+        from fastapi import HTTPException
+        rep = {"as_of": "2026-10-27", "pool": 2, "screened": 2, "passed": ["KO"],
+               "results": {"KO": {"passed": True, "checks": {"debt": {"value": float("inf")}}}}}
+        (self.tmp / "screen_2026-10-27.json").write_text(json.dumps(rep))
+        (self.tmp / "secret.json").write_text("{}")
+        self.assertEqual(self.api.screen_reports(), [{"name": "screen_2026-10-27.json", "as_of": "2026-10-27",
+                                                      "pool": 2, "screened": 2, "passed": 1}])
+        got = self.api.screen_report("screen_2026-10-27.json")
+        self.assertIsNone(got["results"]["KO"]["checks"]["debt"]["value"])   # Infinity -> null
+        for bad in ("secret.json", "../screen_x.json", "screen_missing.json"):
+            with self.assertRaises(HTTPException):
+                self.api.screen_report(bad)
+
+    def test_results_carry_rule_group(self):
+        roa = pd.Series([0.012] * 10)
+        m = {"_roe": pd.Series([0.16] * 10), "_roa": roa, "equity_to_assets": 0.09, "profitable_years": 10}
+        self.assertEqual(screen_company(m, ScreenConfig(), "Financials")["group"], "financials")
+        self.assertEqual(screen_company(m, ScreenConfig(), "Utilities")["group"], "provisional")
+        self.assertEqual(screen_company(m, ScreenConfig(), None)["group"], "general")
+
+
 if __name__ == "__main__":
     unittest.main()

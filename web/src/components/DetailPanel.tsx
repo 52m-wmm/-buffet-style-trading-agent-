@@ -1,51 +1,6 @@
-import type { ScreenParams, Step, StepRun } from "../api";
+import type { ScreenParams, ScreenReport, ScreenReportInfo, Step, StepRun } from "../api";
 import { ScreenForm, ScreenUsed, type ScreenDraft } from "./ScreenForm";
-
-const SCREEN_CHECKS: [string, string][] = [
-  ["roe", "ROE"],
-  ["debt", "负债"],
-  ["profitability", "盈利"],
-  ["fcf", "现金流"],
-  ["gross_margin", "毛利率"],
-  ["roa", "ROA"],
-  ["capital", "资本"],
-];
-
-function ScreenResultView({ out }: { out: any }) {
-  const results: Record<string, any> = out.results ?? {};
-  const controls: string[] = out.controls ?? [];
-  return (
-    <>
-    <h3>每家公司的结果</h3>
-    <table className="grid">
-      <thead>
-        <tr>
-          <th>股票</th>
-          {SCREEN_CHECKS.map(([k, name]) => <th key={k}>{name}</th>)}
-          <th>结果</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Object.entries(results).map(([t, r]) => (
-          <tr key={t}>
-            <td>{t}</td>
-            {SCREEN_CHECKS.map(([k]) => {
-              const c = r.checks?.[k];
-              if (!c || c.na) return <td key={k} title={c?.why ?? "这条规则不适用"}>—</td>;
-              return (
-                <td key={k} className={c.pass ? "verdict--pass" : "verdict--fail"} title={[c.rule, c.why].filter(Boolean).join("；")}>
-                  {c.pass ? "✓" : "✗"}
-                </td>
-              );
-            })}
-            <td>{r.passed ? "通过" : controls.includes(t) ? "对照组" : "淘汰"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    </>
-  );
-}
+import { ScreenResults } from "./ScreenResults";
 
 const CHECK_NAMES: Record<string, string> = {
   consistency: "多次运行一致性",
@@ -125,7 +80,50 @@ type ScreenProps = {
   defaults: ScreenParams | null;
   used: ScreenParams | null;
   onDraftChange: (d: ScreenDraft) => void;
+  reports: ScreenReportInfo[];
+  source: string | null; // null = the selected run, otherwise a report name
+  onSource: (s: string | null) => void;
+  report: ScreenReport | null;
 };
+
+function SourcePicker({ screen }: { screen: ScreenProps }) {
+  if (!screen.reports.length) return null;
+  return (
+    <div className="seg" role="radiogroup" aria-label="看哪份结果">
+      <button role="radio" aria-checked={screen.source == null}
+              className={screen.source == null ? "seg--on" : undefined} onClick={() => screen.onSource(null)}>
+        演示运行
+      </button>
+      {screen.reports.map((r) => (
+        <button key={r.name} role="radio" aria-checked={screen.source === r.name}
+                className={screen.source === r.name ? "seg--on" : undefined} onClick={() => screen.onSource(r.name)}>
+          标普500 · {r.as_of}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReportView({ report, defaults }: { report: ScreenReport; defaults: ScreenParams | null }) {
+  const skipped = Object.keys(report.skipped ?? {}).length;
+  return (
+    <>
+      <p className="panel__summary panel__summary--ok">
+        {report.as_of} 的标普500成分股：筛了 {report.screened} 家，{report.passed.length} 家通过
+        {skipped ? `，${skipped} 家取不到数据跳过` : ""}。
+      </p>
+      <p className="note">
+        这份报告是命令行生成的，只读 SEC 财报数据，不调用模型。改了阈值要在 backend 目录重新运行
+        <code>python -m buffett_agent screen</code>（有缓存时十几秒）。
+      </p>
+      <ScreenResults results={report.results} lookback={report.thresholds.lookback_years} />
+      <details className="raw">
+        <summary>这份报告用的阈值</summary>
+        <ScreenUsed used={report.thresholds} defaults={defaults} title="" />
+      </details>
+    </>
+  );
+}
 
 export function DetailPanel({ step, run, screen }: { step?: Step; run?: StepRun; screen: ScreenProps }) {
   if (!step) {
@@ -142,15 +140,22 @@ export function DetailPanel({ step, run, screen }: { step?: Step; run?: StepRun;
         <span className={`tag tag--${step.kind}`}>{step.kind === "model" ? "调用模型" : "代码规则"}</span>
       </header>
       <p className="panel__desc">{step.desc}</p>
-      {step.id === "screen" && screen.draft && screen.defaults && (
+      {step.id === "screen" && <SourcePicker screen={screen} />}
+      {step.id === "screen" && screen.source != null && (
+        screen.report ? <ReportView report={screen.report} defaults={screen.defaults} /> : <p className="note">读取报告中…</p>
+      )}
+      {step.id === "screen" && screen.source == null && screen.draft && screen.defaults && (
         <ScreenForm draft={screen.draft} defaults={screen.defaults} onChange={screen.onDraftChange} />
       )}
-      {!run && <p className="note">还没有运行记录。点“运行演示”开始。</p>}
-      {run && (
+      {!run && !(step.id === "screen" && screen.source != null) && <p className="note">还没有运行记录。点“运行演示”开始。</p>}
+      {run && !(step.id === "screen" && screen.source != null) && (
         <>
           <p className={`panel__summary panel__summary--${run.status}`}>{run.summary}</p>
           {step.id === "screen" && screen.used && <ScreenUsed used={screen.used} defaults={screen.defaults} />}
-          {step.id === "screen" && run.status === "ok" && <ScreenResultView out={run.output} />}
+          {step.id === "screen" && run.status === "ok" && (
+            <ScreenResults results={run.output.results ?? {}} controls={run.output.controls ?? []}
+                           lookback={screen.used?.lookback_years ?? screen.defaults?.lookback_years ?? 10} />
+          )}
           {step.id === "check" && run.status === "ok" && <CheckView out={run.output} />}
           {step.id === "execute" && run.status === "ok" && <TradesView out={run.output} />}
           <details className="raw">

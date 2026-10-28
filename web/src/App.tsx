@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Background, Controls, ReactFlow, type Edge } from "@xyflow/react";
-import { api, type Graph, type Run, type ScreenParams, type StepRun } from "./api";
+import { api, type Graph, type Run, type ScreenParams, type ScreenReport, type ScreenReportInfo, type StepRun } from "./api";
 import { StepNode, type StepFlowNode } from "./components/StepNode";
 import { DetailPanel } from "./components/DetailPanel";
 import { parseDraft, sameScreen, toDraft, type ScreenDraft } from "./components/ScreenForm";
@@ -17,6 +17,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [screenDefaults, setScreenDefaults] = useState<ScreenParams | null>(null);
   const [screenDraft, setScreenDraft] = useState<ScreenDraft | null>(null);
+  const [reports, setReports] = useState<ScreenReportInfo[]>([]);
+  const [reportName, setReportName] = useState<string | null>(null);
+  const [report, setReport] = useState<ScreenReport | null>(null);
 
   useEffect(() => {
     Promise.all([api.graph(), api.runs(), api.screenDefaults()])
@@ -28,7 +31,14 @@ export default function App() {
         if (r[0]) setRunId(r[0].id);
       })
       .catch(() => setError("连不上后端。先在 backend 目录运行：uvicorn buffett_agent.api:app --port 8000"));
+    api.screenReports().then(setReports).catch(() => setReports([]));
   }, []);
+
+  useEffect(() => {
+    setReport(null);
+    if (!reportName) return;
+    api.screenReport(reportName).then(setReport).catch((e) => setError(`读取报告失败：${e.message}`));
+  }, [reportName]);
 
   useEffect(() => {
     if (!runId) return;
@@ -45,6 +55,7 @@ export default function App() {
       const { id } = await api.startDemo(parsed?.params);
       setRuns(await api.runs());
       setRunId(id);
+      setReportName(null);
       setSelected("screen");
     } catch (e: any) {
       setError(`运行失败：${e.message}`);
@@ -123,7 +134,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="body">
+      <main className={`body${selected === "screen" ? " body--wide" : ""}`}>
         <section className="canvas" aria-label="工作流画布">
           <ReactFlow
             nodes={nodes}
@@ -147,6 +158,10 @@ export default function App() {
             defaults: screenDefaults,
             used: currentRun?.screen ?? null,
             onDraftChange: setScreenDraft,
+            reports,
+            source: reportName,
+            onSource: setReportName,
+            report,
           }}
         />
       </main>
