@@ -127,7 +127,10 @@ def screening_metrics(f: Fundamentals, lookback: int = 10, fcf_years: int = 5) -
             out["debt_to_income"] = (float(a["lt_debt"].iloc[-1] / last_ni)
                                      if last_ni > 0 else float("inf"))
         else:
-            out["debt_to_income"] = 0.0 if "lt_debt" in f.missing else None
+            # No debt reported for the latest year (MNST, ANET, TER paid theirs off): count it
+            # as zero and flag it, since an untagged balance would look the same.
+            out["debt_to_income"] = 0.0
+            out["debt_assumed_zero"] = True
     if {"ocf", "capex"} <= set(a):
         fcf = (a["ocf"] - a["capex"]).tail(fcf_years)
         out["fcf_cumulative"] = float(fcf.sum())

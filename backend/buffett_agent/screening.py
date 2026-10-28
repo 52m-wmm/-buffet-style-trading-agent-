@@ -24,6 +24,8 @@ def screen_company(metrics: dict, cfg: ScreenConfig) -> dict:
     checks["debt"] = {"pass": d2i is not None and d2i <= cfg.debt_to_income_max,
                       "value": None if d2i is None or math.isinf(d2i) else round(d2i, 2),
                       "rule": f"long-term debt <= {cfg.debt_to_income_max}x net income"}
+    if metrics.get("debt_assumed_zero"):
+        checks["debt"]["why"] = "no long-term debt reported for the latest year; counted as 0"
 
     py = metrics.get("profitable_years")
     checks["profitability"] = {"pass": py is not None and py >= cfg.profitable_years_required,

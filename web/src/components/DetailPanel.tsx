@@ -30,7 +30,7 @@ function ScreenResultView({ out }: { out: any }) {
             {SCREEN_CHECKS.map(([k]) => {
               const c = r.checks?.[k];
               return (
-                <td key={k} className={c?.pass ? "verdict--pass" : "verdict--fail"} title={c?.rule ?? c?.why}>
+                <td key={k} className={c?.pass ? "verdict--pass" : "verdict--fail"} title={[c?.rule, c?.why].filter(Boolean).join("；")}>
                   {c?.pass ? "✓" : "✗"}
                 </td>
               );

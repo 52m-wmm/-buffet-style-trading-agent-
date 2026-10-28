@@ -89,6 +89,20 @@ class Metrics(unittest.TestCase):
                          "LongTermDebtNoncurrent + LongTermDebtAndCapitalLeaseObligations")
 
 
+    def test_missing_latest_debt_counts_as_zero_and_is_flagged(self):
+        def row(y, v):
+            return {"form": "10-K", "fp": "FY", "end": f"{y}-12-31", "filed": f"{y + 1}-02-20", "val": v}
+        def flow(y, v):
+            return dict(row(y, v), start=f"{y}-01-01")
+        facts = {"facts": {"us-gaap": {
+            "NetIncomeLoss": {"units": {"USD": [flow(2022, 10), flow(2023, 12)]}},
+            "LongTermDebtNoncurrent": {"units": {"USD": [row(2022, 5)]}},   # repaid in 2023
+        }}}
+        m = screening_metrics(fundamentals_as_of(facts, date(2026, 1, 1)))
+        self.assertEqual(m["debt_to_income"], 0.0)
+        self.assertTrue(m["debt_assumed_zero"])
+
+
     def test_gross_profit_is_derived_for_years_it_was_not_tagged(self):
         def flow(y, v):
             return {"form": "10-K", "start": f"{y}-01-01", "end": f"{y}-12-31", "filed": f"{y + 1}-02-20", "val": v}

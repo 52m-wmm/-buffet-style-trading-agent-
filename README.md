@@ -12,7 +12,7 @@
 ```bash
 cd backend
 pip install -r requirements.txt
-python -m unittest -v          # 30个离线测试
+python -m unittest -v          # 32个离线测试
 python -m buffett_agent demo   # 用6家虚构公司跑完整流程
 ```
 
@@ -91,6 +91,7 @@ web/                   React + React Flow 画布
 - yfinance 不含已退市股票，有幸存者偏差。
 - 往前跑的模拟盘（持仓跨周持久化、联网调研）还没实现，`research` 一步在回测模式下只读文件。
 - XBRL 标签映射只覆盖常见标签，需要抽查核对。
+- 最近一年没报长期负债的公司按负债为 0 处理（如 MNST、ANET、TER 已还清债务），第1步结果里会注明。但标签没覆盖到的负债也会被当成 0，通过的这类公司要抽查。
 - 最初在没有网络的环境里写成；2026-10-27 已在本地实际跑通 FastAPI 接口和前端（Python 3.9 + Node 24），修了两个启动时才暴露的问题。真实数据只试跑过初筛，完整回测还没跑过。
 
 ## 一个检验里发现的问题
