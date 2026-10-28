@@ -11,6 +11,9 @@ export const SCREEN_FIELDS: FieldDef[] = [
   { key: "profitable_years_required", label: "盈利年数", unit: "年", int: true, hint: "净利润 > 0 的年数至少这么多" },
   { key: "fcf_years", label: "自由现金流统计年数", unit: "年", int: true, hint: "最近这么多年累计自由现金流要 > 0" },
   { key: "gross_margin_std_max", label: "毛利率标准差上限", unit: "%", pct: true, hint: "窗口内毛利率波动要小于它" },
+  { key: "roa_min", label: "金融业：ROA 门槛", unit: "%", pct: true, hint: "只用于金融公司，代替负债、现金流、毛利率三条" },
+  { key: "roa_years_required", label: "金融业：ROA 达标年数", unit: "年", int: true, hint: "窗口内至少这么多年 ROA 高于门槛" },
+  { key: "equity_to_assets_min", label: "金融业：股东权益 / 总资产", unit: "%", pct: true, hint: "最近一年，资本垫子至少这么厚" },
 ];
 
 /** What the user is typing, in display units (percent fields shown as 15, not 0.15). */
@@ -35,7 +38,7 @@ export function parseDraft(d: ScreenDraft): { params?: ScreenParams; errors: Par
   }
   const lb = out.lookback_years;
   if (lb != null) {
-    for (const k of ["roe_years_required", "profitable_years_required", "fcf_years"] as Key[]) {
+    for (const k of ["roe_years_required", "profitable_years_required", "fcf_years", "roa_years_required"] as Key[]) {
       if (out[k] != null && out[k]! > lb) errors[k] = `不能超过回看年数 ${lb}`;
     }
   }
@@ -98,7 +101,7 @@ export function ScreenUsed({ used, defaults }: { used: ScreenParams; defaults: S
       <h3>这次运行用的阈值</h3>
       <table className="kv">
         <tbody>
-          {SCREEN_FIELDS.map((f) => {
+          {SCREEN_FIELDS.filter((f) => used[f.key] != null).map((f) => {
             const differs = defaults != null && used[f.key] !== defaults[f.key];
             return (
               <tr key={f.key}>

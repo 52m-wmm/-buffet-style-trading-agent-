@@ -7,6 +7,8 @@ const SCREEN_CHECKS: [string, string][] = [
   ["profitability", "盈利"],
   ["fcf", "现金流"],
   ["gross_margin", "毛利率"],
+  ["roa", "ROA"],
+  ["capital", "资本"],
 ];
 
 function ScreenResultView({ out }: { out: any }) {
@@ -29,9 +31,10 @@ function ScreenResultView({ out }: { out: any }) {
             <td>{t}</td>
             {SCREEN_CHECKS.map(([k]) => {
               const c = r.checks?.[k];
+              if (!c || c.na) return <td key={k} title={c?.why ?? "这条规则不适用"}>—</td>;
               return (
-                <td key={k} className={c?.pass ? "verdict--pass" : "verdict--fail"} title={[c?.rule, c?.why].filter(Boolean).join("；")}>
-                  {c?.pass ? "✓" : "✗"}
+                <td key={k} className={c.pass ? "verdict--pass" : "verdict--fail"} title={[c.rule, c.why].filter(Boolean).join("；")}>
+                  {c.pass ? "✓" : "✗"}
                 </td>
               );
             })}

@@ -8,6 +8,9 @@ export type ScreenParams = {
   fcf_years: number;
   gross_margin_std_max: number;
   lookback_years: number;
+  roa_min: number; // financials only
+  roa_years_required: number;
+  equity_to_assets_min: number;
 };
 export type Run = {
   id: string;

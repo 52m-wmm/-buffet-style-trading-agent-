@@ -36,6 +36,9 @@ class ScreenOverrides(BaseModel):
     fcf_years: int | None = Field(None, ge=1, le=30)
     gross_margin_std_max: float | None = Field(None, gt=0, le=1)
     lookback_years: int | None = Field(None, ge=1, le=30)
+    roa_min: float | None = Field(None, ge=0, le=1)
+    roa_years_required: int | None = Field(None, ge=0, le=30)
+    equity_to_assets_min: float | None = Field(None, ge=0, le=1)
 
 
 class RunRequest(BaseModel):

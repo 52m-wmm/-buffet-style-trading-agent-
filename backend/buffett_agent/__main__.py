@@ -78,8 +78,11 @@ def screen_only(a, cfg) -> None:
     if tickers:
         tmap = client.ticker_map()
         ciks = {t: tmap[t] for t in tickers if t in tmap}
+        sectors = {m.ticker: m.sector for m in sp500() if m.ticker in ciks}
     else:
-        ciks = {m.ticker: m.cik for m in sp500(a.as_of)}
+        members = sp500(a.as_of)
+        ciks = {m.ticker: m.cik for m in members}
+        sectors = {m.ticker: m.sector for m in members}
         tickers = list(ciks)
         print(f"no --tickers: screening {len(tickers)} S&P 500 members as of {a.as_of}")
 
@@ -92,7 +95,7 @@ def screen_only(a, cfg) -> None:
         if i % 25 == 0 or i == n:
             print(f"  {i}/{n} {t}", flush=True)
 
-    rep = screen_pool(load, tickers, a.as_of, cfg.screen, progress)
+    rep = screen_pool(load, tickers, a.as_of, cfg.screen, progress, sectors)
     out = a.out or f"screen_{a.as_of}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(rep, f, ensure_ascii=False, indent=1, default=str)

@@ -25,7 +25,7 @@ from .trading.valuation import valuation
 
 STEPS = [
     {"id": "screen", "label": "1 规则初筛", "kind": "code",
-     "desc": "按ROE、负债、盈利稳定、自由现金流、毛利率过滤"},
+     "desc": "按ROE、负债、盈利稳定、自由现金流、毛利率过滤；金融公司改看ROA和资本充足"},
     {"id": "data", "label": "2 数据准备", "kind": "code",
      "desc": "只取决策日之前提交的10-K；切段；生成匿名版本"},
     {"id": "research", "label": "3 研究", "kind": "model",
@@ -90,8 +90,9 @@ class Pipeline:
                 for t, c in companies.items():
                     f = fundamentals_as_of(c.facts, as_of)
                     m = screening_metrics(f, cfg.screen.lookback_years, cfg.screen.fcf_years)
-                    results[t] = screen_company(m, cfg.screen)
+                    results[t] = screen_company(m, cfg.screen, c.sector)
                     m.pop("_roe", None)
+                    m.pop("_roa", None)
                     metrics[t] = m
                 passed, controls = split_universe(results)
                 self._metrics = metrics

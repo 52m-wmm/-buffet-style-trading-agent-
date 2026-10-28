@@ -20,6 +20,12 @@ class ScreenConfig:
     fcf_years: int = 5               # cumulative FCF over this many years must be > 0
     gross_margin_std_max: float = 0.05
     lookback_years: int = 10
+    # Financials (GICS sector): deposits and float are the business, so debt, FCF and gross
+    # margin say nothing. Buffett judges banks by return on assets and by how much capital
+    # stands behind them; these two rules replace the three that don't apply.
+    roa_min: float = 0.01                 # net income / total assets per year
+    roa_years_required: int = 8
+    equity_to_assets_min: float = 0.08    # latest year
 
 
 @dataclass(frozen=True)
@@ -80,7 +86,8 @@ def with_screen(cfg: Config, overrides: dict) -> Config:
     if unknown:
         raise ValueError(f"unknown screen thresholds: {', '.join(sorted(unknown))}")
     s = replace(cfg.screen, **{k: v for k, v in overrides.items() if v is not None})
-    for name in ("roe_years_required", "profitable_years_required", "fcf_years"):
+    for name in ("roe_years_required", "profitable_years_required", "fcf_years",
+                 "roa_years_required"):
         if getattr(s, name) > s.lookback_years:
             raise ValueError(f"{name} ({getattr(s, name)}) > lookback_years ({s.lookback_years})")
     return replace(cfg, screen=s)

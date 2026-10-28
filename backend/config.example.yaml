@@ -6,6 +6,9 @@ screen:
   profitable_years_required: 9
   fcf_years: 5
   gross_margin_std_max: 0.05
+  roa_min: 0.01              # financials only, replace debt / FCF / gross margin
+  roa_years_required: 8
+  equity_to_assets_min: 0.08
 decision:
   buy_total_min: 4.0
   buy_dimension_floor: 2

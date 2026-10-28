@@ -9,7 +9,7 @@ from unittest import mock
 import pandas as pd
 
 from buffett_agent import demo
-from buffett_agent.config import Config, CostConfig, DecisionConfig, RiskConfig, with_screen
+from buffett_agent.config import Config, CostConfig, DecisionConfig, RiskConfig, ScreenConfig, with_screen
 from buffett_agent.data.prices import PriceStore
 from buffett_agent.data.sections import split_10k
 from buffett_agent.data.universe import sp500
@@ -19,7 +19,7 @@ from buffett_agent.pipeline import run_demo
 from buffett_agent.research.anonymize import anonymize
 from buffett_agent.research.citations import verify_quote, verify_scorecard
 from buffett_agent.research.scoring import score_company
-from buffett_agent.screening import screen_pool
+from buffett_agent.screening import screen_company, screen_pool
 from buffett_agent.sources import EdgarSource
 from buffett_agent.store import Store
 from buffett_agent.trading.backtest import (LookAheadError, ScoreSnapshot, latest_snapshot,
@@ -101,6 +101,39 @@ class Metrics(unittest.TestCase):
         m = screening_metrics(fundamentals_as_of(facts, date(2026, 1, 1)))
         self.assertEqual(m["debt_to_income"], 0.0)
         self.assertTrue(m["debt_assumed_zero"])
+
+    def _no_debt_tag_facts(self, **extra):
+        def flow(y, v):
+            return {"form": "10-K", "start": f"{y}-01-01", "end": f"{y}-12-31", "filed": f"{y + 1}-02-20", "val": v}
+        g = {"NetIncomeLoss": {"units": {"USD": [flow(2022, 10), flow(2023, 12)]}}}
+        for tag, rows in extra.items():
+            g[tag] = {"units": {"USD": rows}}
+        return {"facts": {"us-gaap": g}}
+
+    def test_untagged_debt_balance_is_used_not_zero(self):
+        bal = {"form": "10-K", "end": "2023-12-31", "filed": "2024-02-20"}
+        facts = self._no_debt_tag_facts(NotesPayable=[dict(bal, val=60)],
+                                        AvailableForSaleSecuritiesDebtSecurities=[dict(bal, val=999)])
+        m = screening_metrics(fundamentals_as_of(facts, date(2026, 1, 1)))
+        self.assertEqual(m["debt_to_income"], 5.0)            # 60 / 12; the securities are assets
+        self.assertEqual(m["debt_source"], "NotesPayable")
+
+    def test_real_interest_without_debt_balance_is_unknown(self):
+        facts = self._no_debt_tag_facts(InterestExpense=[
+            {"form": "10-K", "start": "2023-01-01", "end": "2023-12-31", "filed": "2024-02-20", "val": 3}])
+        m = screening_metrics(fundamentals_as_of(facts, date(2026, 1, 1)))
+        self.assertTrue(m["debt_unknown"])                    # 3 / 12 = 25% of net income
+        self.assertFalse(screen_company(m, ScreenConfig())["checks"]["debt"]["pass"])
+
+    def test_financials_use_roa_and_capital_instead_of_debt(self):
+        roa = pd.Series([0.012] * 10)
+        m = {"_roe": pd.Series([0.16] * 10), "_roa": roa, "equity_to_assets": 0.09,
+             "profitable_years": 10, "debt_to_income": 30.0}   # a bank's deposits-funded balance sheet
+        self.assertFalse(screen_company(m, ScreenConfig())["passed"])
+        r = screen_company(m, ScreenConfig(), "Financials")
+        self.assertTrue(r["passed"])
+        self.assertTrue(r["checks"]["debt"]["na"])
+        self.assertFalse(screen_company(dict(m, equity_to_assets=0.05), ScreenConfig(), "Financials")["passed"])
 
 
     def test_gross_profit_is_derived_for_years_it_was_not_tagged(self):
